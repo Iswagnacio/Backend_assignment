@@ -297,6 +297,4 @@ output "database_connection_name" {
 output "service_account_email" {
   description = "Email of the service account"
   value       = google_service_account.cloud_run_sa.email
-}.com/cloudsql-instances"    = google_sql_database_instance.postgres.connection_name
-        "run.googleapis.com/execution-environment" = "gen2"
-        "run.googleapis
+}
