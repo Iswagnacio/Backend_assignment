@@ -109,6 +109,7 @@
             color: #6c757d;
             font-style: italic;
         }
+
     </style>
 </head>
 <body>
@@ -141,8 +142,8 @@
         let websocket = null;
         let currentShortCode = null;
         
-        // API base URL - adjust this to match your deployment
-        const API_BASE_URL = window.location.origin;
+        // API base URL - fixed for local development
+        const API_BASE_URL = "http://localhost:8000";
         
         async function shortenUrl() {
             const urlInput = document.getElementById('urlInput');
@@ -154,6 +155,7 @@
             }
             
             try {
+                console.log(`Making request to: ${API_BASE_URL}/shorten`);
                 const response = await fetch(`${API_BASE_URL}/shorten`, {
                     method: 'POST',
                     headers: {
@@ -181,6 +183,7 @@
                 document.getElementById('shortCodeInput').value = data.short_code;
                 
             } catch (error) {
+                console.error('Error shortening URL:', error);
                 showResult(`Error: ${error.message}`, 'error');
             }
         }
@@ -199,9 +202,10 @@
             }
             
             currentShortCode = shortCode;
-            const wsUrl = `${API_BASE_URL.replace('http', 'ws')}/ws/analytics/${shortCode}`;
+            const wsUrl = `${API_BASE_URL.replace('http://', 'ws://').replace('https://', 'wss://')}/ws/analytics/${shortCode}`;
             
             try {
+                console.log(`Connecting to WebSocket: ${wsUrl}`);
                 websocket = new WebSocket(wsUrl);
                 
                 websocket.onopen = function(event) {
@@ -213,6 +217,7 @@
                 };
                 
                 websocket.onmessage = function(event) {
+                    console.log('WebSocket message received:', event.data);
                     const data = JSON.parse(event.data);
                     
                     if (data.type === 'heartbeat') {
@@ -234,11 +239,13 @@
                 };
                 
                 websocket.onerror = function(error) {
+                    console.error('WebSocket error:', error);
                     showResult(`WebSocket error: ${error.message || 'Connection failed'}`, 'error');
                     updateWebSocketStatus('disconnected');
                 };
                 
             } catch (error) {
+                console.error('Failed to connect WebSocket:', error);
                 showResult(`Failed to connect: ${error.message}`, 'error');
             }
         }
@@ -297,6 +304,11 @@
             if (websocket) {
                 websocket.close();
             }
+        });
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('WebSocket client ready for server at:', API_BASE_URL);
         });
     </script>
 </body>
