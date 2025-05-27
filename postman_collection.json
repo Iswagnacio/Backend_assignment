@@ -1,0 +1,438 @@
+{
+  "info": {
+    "name": "URL Shortener API",
+    "description": "Complete API collection for URL Shortener service with real-time analytics",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "shortCode",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/health",
+          "host": ["{{baseUrl}}"],
+          "path": ["health"]
+        },
+        "description": "Check if the service is running properly"
+      },
+      "response": [
+        {
+          "name": "Healthy Response",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n  \"status\": \"healthy\",\n  \"timestamp\": \"2024-01-15T10:30:00.000Z\"\n}"
+        }
+      ]
+    },
+    {
+      "name": "Root Endpoint - API Info",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/",
+          "host": ["{{baseUrl}}"],
+          "path": [""]
+        },
+        "description": "Get API information and available endpoints"
+      },
+      "response": [
+        {
+          "name": "API Info Response",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/",
+              "host": ["{{baseUrl}}"],
+              "path": [""]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n  \"message\": \"URL Shortener Service\",\n  \"version\": \"1.0.0\",\n  \"endpoints\": {\n    \"POST /shorten\": \"Create a shortened URL\",\n    \"GET /{short_code}\": \"Redirect to original URL\",\n    \"GET /analytics/{short_code}\": \"Get analytics for short URL\",\n    \"WS /ws/analytics/{short_code}\": \"Real-time analytics updates\"\n  }\n}"
+        }
+      ]
+    },
+    {
+      "name": "Create Short URL",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Response has required fields\", function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData).to.have.property('short_code');",
+              "    pm.expect(jsonData).to.have.property('shortened_url');",
+              "    pm.expect(jsonData).to.have.property('original_url');",
+              "});",
+              "",
+              "pm.test(\"Short code is correct length\", function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData.short_code).to.have.lengthOf(6);",
+              "});",
+              "",
+              "// Save short code for other requests",
+              "if (pm.response.code === 200) {",
+              "    var jsonData = pm.response.json();",
+              "    pm.collectionVariables.set('shortCode', jsonData.short_code);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"url\": \"https://www.example.com\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/shorten",
+          "host": ["{{baseUrl}}"],
+          "path": ["shorten"]
+        },
+        "description": "Create a shortened URL from a long URL"
+      },
+      "response": [
+        {
+          "name": "Successful Creation",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"https://www.example.com\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/shorten",
+              "host": ["{{baseUrl}}"],
+              "path": ["shorten"]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n  \"short_code\": \"abc123\",\n  \"shortened_url\": \"http://localhost:8000/abc123\",\n  \"original_url\": \"https://www.example.com\"\n}"
+        }
+      ]
+    },
+    {
+      "name": "Create Short URL - Invalid URL",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"url\": \"not-a-valid-url\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/shorten",
+          "host": ["{{baseUrl}}"],
+          "path": ["shorten"]
+        },
+        "description": "Test error handling with invalid URL"
+      },
+      "response": [
+        {
+          "name": "Validation Error",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"not-a-valid-url\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/shorten",
+              "host": ["{{baseUrl}}"],
+              "path": ["shorten"]
+            }
+          },
+          "status": "Unprocessable Entity",
+          "code": 422,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n  \"detail\": [\n    {\n      \"type\": \"url_parsing\",\n      \"loc\": [\"body\", \"url\"],\n      \"msg\": \"Input should be a valid URL\",\n      \"input\": \"not-a-valid-url\"\n    }\n  ]\n}"
+        }
+      ]
+    },
+    {
+      "name": "Redirect to Original URL",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/{{shortCode}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["{{shortCode}}"]
+        },
+        "description": "Follow the short URL to be redirected to the original URL. This also increments the redirect counter."
+      },
+      "response": [
+        {
+          "name": "Successful Redirect",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/abc123",
+              "host": ["{{baseUrl}}"],
+              "path": ["abc123"]
+            }
+          },
+          "status": "Found",
+          "code": 302,
+          "_postman_previewlanguage": "plain",
+          "header": [
+            {
+              "key": "Location",
+              "value": "https://www.example.com"
+            }
+          ],
+          "cookie": [],
+          "body": ""
+        }
+      ]
+    },
+    {
+      "name": "Redirect - Not Found",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/nonexistent",
+          "host": ["{{baseUrl}}"],
+          "path": ["nonexistent"]
+        },
+        "description": "Test error handling for non-existent short codes"
+      },
+      "response": [
+        {
+          "name": "Short URL Not Found",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/nonexistent",
+              "host": ["{{baseUrl}}"],
+              "path": ["nonexistent"]
+            }
+          },
+          "status": "Not Found",
+          "code": 404,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n  \"detail\": \"Short URL not found\"\n}"
+        }
+      ]
+    },
+    {
+      "name": "Get Analytics",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status code is 200\", function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Response has analytics data\", function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData).to.have.property('short_code');",
+              "    pm.expect(jsonData).to.have.property('original_url');",
+              "    pm.expect(jsonData).to.have.property('redirect_count');",
+              "    pm.expect(jsonData).to.have.property('created_at');",
+              "});",
+              "",
+              "pm.test(\"Redirect count is a number\", function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData.redirect_count).to.be.a('number');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/analytics/{{shortCode}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["analytics", "{{shortCode}}"]
+        },
+        "description": "Get analytics data for a specific short URL"
+      },
+      "response": [
+        {
+          "name": "Analytics Data",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/analytics/abc123",
+              "host": ["{{baseUrl}}"],
+              "path": ["analytics", "abc123"]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n  \"short_code\": \"abc123\",\n  \"original_url\": \"https://www.example.com\",\n  \"redirect_count\": 5,\n  \"created_at\": \"2024-01-15T10:30:00.000Z\"\n}"
+        }
+      ]
+    },
+    {
+      "name": "Get Analytics - Not Found",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/analytics/nonexistent",
+          "host": ["{{baseUrl}}"],
+          "path": ["analytics", "nonexistent"]
+        },
+        "description": "Test analytics endpoint with non-existent short code"
+      },
+      "response": [
+        {
+          "name": "Analytics Not Found",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/analytics/nonexistent",
+              "host": ["{{baseUrl}}"],
+              "path": ["analytics", "nonexistent"]
+            }
+          },
+          "status": "Not Found",
+          "code": 404,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n  \"detail\": \"Short URL not found\"\n}"
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          ""
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          ""
+        ]
+      }
+    }
+  ]
+}

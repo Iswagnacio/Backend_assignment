@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>URL Shortener - Real-time Analytics</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input[type="url"], input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 4px;
+        }
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .analytics {
+            background-color: #e2e3e5;
+            border: 1px solid #d6d8db;
+            color: #383d41;
+        }
+        .websocket-status {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .connected {
+            background-color: #28a745;
+            color: white;
+        }
+        .disconnected {
+            background-color: #dc3545;
+            color: white;
+        }
+        .real-time-data {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            border-left: 4px solid #007bff;
+        }
+        .metric {
+            display: inline-block;
+            margin-right: 20px;
+            font-weight: bold;
+        }
+        .timestamp {
+            font-size: 12px;
+            color: #6c757d;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>URL Shortener with Real-time Analytics</h1>
+        
+        <div class="form-group">
+            <label for="urlInput">Enter URL to shorten:</label>
+            <input type="url" id="urlInput" placeholder="https://example.com" required>
+            <button onclick="shortenUrl()">Shorten URL</button>
+        </div>
+        
+        <div class="form-group">
+            <label for="shortCodeInput">Enter short code for analytics:</label>
+            <input type="text" id="shortCodeInput" placeholder="abc123">
+            <button onclick="connectWebSocket()" id="connectBtn">Connect Real-time Analytics</button>
+            <button onclick="disconnectWebSocket()" id="disconnectBtn" disabled>Disconnect</button>
+            <span id="wsStatus" class="websocket-status disconnected">Disconnected</span>
+        </div>
+        
+        <div id="results"></div>
+        
+        <div id="realTimeData" class="real-time-data" style="display: none;">
+            <h3>Real-time Analytics</h3>
+            <div id="analyticsContent"></div>
+        </div>
+    </div>
+
+    <script>
+        let websocket = null;
+        let currentShortCode = null;
+        
+        // API base URL - adjust this to match your deployment
+        const API_BASE_URL = window.location.origin;
+        
+        async function shortenUrl() {
+            const urlInput = document.getElementById('urlInput');
+            const url = urlInput.value.trim();
+            
+            if (!url) {
+                showResult('Please enter a URL', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/shorten`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ url: url })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                const resultHtml = `
+                    <strong>Success!</strong><br>
+                    <strong>Short Code:</strong> ${data.short_code}<br>
+                    <strong>Shortened URL:</strong> <a href="${data.shortened_url}" target="_blank">${data.shortened_url}</a><br>
+                    <strong>Original URL:</strong> <a href="${data.original_url}" target="_blank">${data.original_url}</a>
+                `;
+                
+                showResult(resultHtml, 'success');
+                
+                // Auto-fill the short code input for convenience
+                document.getElementById('shortCodeInput').value = data.short_code;
+                
+            } catch (error) {
+                showResult(`Error: ${error.message}`, 'error');
+            }
+        }
+        
+        function connectWebSocket() {
+            const shortCodeInput = document.getElementById('shortCodeInput');
+            const shortCode = shortCodeInput.value.trim();
+            
+            if (!shortCode) {
+                showResult('Please enter a short code', 'error');
+                return;
+            }
+            
+            if (websocket) {
+                websocket.close();
+            }
+            
+            currentShortCode = shortCode;
+            const wsUrl = `${API_BASE_URL.replace('http', 'ws')}/ws/analytics/${shortCode}`;
+            
+            try {
+                websocket = new WebSocket(wsUrl);
+                
+                websocket.onopen = function(event) {
+                    updateWebSocketStatus('connected');
+                    document.getElementById('connectBtn').disabled = true;
+                    document.getElementById('disconnectBtn').disabled = false;
+                    document.getElementById('realTimeData').style.display = 'block';
+                    showResult(`Connected to real-time analytics for: ${shortCode}`, 'success');
+                };
+                
+                websocket.onmessage = function(event) {
+                    const data = JSON.parse(event.data);
+                    
+                    if (data.type === 'heartbeat') {
+                        console.log('Heartbeat received:', data.timestamp);
+                        return;
+                    }
+                    
+                    updateAnalyticsDisplay(data);
+                };
+                
+                websocket.onclose = function(event) {
+                    updateWebSocketStatus('disconnected');
+                    document.getElementById('connectBtn').disabled = false;
+                    document.getElementById('disconnectBtn').disabled = true;
+                    
+                    if (event.code !== 1000) {
+                        showResult('WebSocket connection closed unexpectedly', 'error');
+                    }
+                };
+                
+                websocket.onerror = function(error) {
+                    showResult(`WebSocket error: ${error.message || 'Connection failed'}`, 'error');
+                    updateWebSocketStatus('disconnected');
+                };
+                
+            } catch (error) {
+                showResult(`Failed to connect: ${error.message}`, 'error');
+            }
+        }
+        
+        function disconnectWebSocket() {
+            if (websocket) {
+                websocket.close(1000, 'User disconnected');
+                websocket = null;
+            }
+            updateWebSocketStatus('disconnected');
+            document.getElementById('connectBtn').disabled = false;
+            document.getElementById('disconnectBtn').disabled = true;
+            document.getElementById('realTimeData').style.display = 'none';
+            showResult('Disconnected from real-time analytics', 'success');
+        }
+        
+        function updateWebSocketStatus(status) {
+            const statusElement = document.getElementById('wsStatus');
+            statusElement.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+            statusElement.className = `websocket-status ${status}`;
+        }
+        
+        function updateAnalyticsDisplay(data) {
+            const content = document.getElementById('analyticsContent');
+            const timestamp = new Date(data.timestamp).toLocaleString();
+            
+            content.innerHTML = `
+                <div class="metric">Short Code: ${data.short_code}</div>
+                <div class="metric">Redirect Count: ${data.redirect_count}</div>
+                <br>
+                <div class="timestamp">Last updated: ${timestamp}</div>
+                ${data.created_at ? `<div class="timestamp">Created: ${new Date(data.created_at).toLocaleString()}</div>` : ''}
+            `;
+        }
+        
+        function showResult(message, type) {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = `<div class="result ${type}">${message}</div>`;
+        }
+        
+        // Handle Enter key in input fields
+        document.getElementById('urlInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                shortenUrl();
+            }
+        });
+        
+        document.getElementById('shortCodeInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                connectWebSocket();
+            }
+        });
+        
+        // Clean up WebSocket connection when page is closed
+        window.addEventListener('beforeunload', function() {
+            if (websocket) {
+                websocket.close();
+            }
+        });
+    </script>
+</body>
+</html>
