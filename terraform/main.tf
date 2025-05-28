@@ -33,7 +33,7 @@ provider "google" {
   region  = var.region
 }
 
-# Enable required APIs (FIXED - these are actual Google Cloud services)
+# Enable required APIs
 resource "google_project_service" "apis" {
   for_each = toset([
     "run.googleapis.com",
@@ -42,7 +42,8 @@ resource "google_project_service" "apis" {
     "secretmanager.googleapis.com",
     "logging.googleapis.com",
     "monitoring.googleapis.com",
-    "containerregistry.googleapis.com"
+    "containerregistry.googleapis.com",
+    "artifactregistry.googleapis.com"  # Added this API
   ])
   
   project = var.project_id
@@ -51,7 +52,7 @@ resource "google_project_service" "apis" {
   disable_dependent_services = false
 }
 
-# Service Account for Cloud Run
+# Service Account for Cloud Run and CI/CD
 resource "google_service_account" "cloud_run_sa" {
   account_id   = "url-shortener-sa"
   display_name = "URL Shortener Service Account"
@@ -59,7 +60,7 @@ resource "google_service_account" "cloud_run_sa" {
   depends_on = [google_project_service.apis]
 }
 
-# IAM roles for the service account (FIXED - kept separate from services)
+# Enhanced IAM roles for the service account
 resource "google_project_iam_member" "cloud_run_sa_roles" {
   for_each = toset([
     "roles/cloudsql.client",
@@ -69,7 +70,10 @@ resource "google_project_iam_member" "cloud_run_sa_roles" {
     "roles/run.developer",
     "roles/run.admin",
     "roles/iam.serviceAccountUser",
-    "roles/iam.serviceAccountTokenCreator"
+    "roles/iam.serviceAccountTokenCreator",
+    "roles/storage.admin",                    # For GCR access
+    "roles/artifactregistry.writer",          # For Artifact Registry
+    "roles/containerregistry.ServiceAgent"   # For Container Registry
   ])
   
   project = var.project_id
@@ -186,7 +190,7 @@ resource "google_cloud_run_service" "url_shortener" {
         
         env {
           name  = "BASE_URL"
-          value = "https://placeholder-url.com"
+          value = "https://url-shortener-url-shortener-20250527232607.a.run.app"
         }
         
         resources {
