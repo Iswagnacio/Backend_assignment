@@ -33,21 +33,48 @@ provider "google" {
   region  = var.region
 }
 
-# Enable required APIs
+# Enable required APIs (FIXED - these are actual Google Cloud services)
 resource "google_project_service" "apis" {
   for_each = toset([
     "run.googleapis.com",
-    "sql-component.googleapis.com",
+    "sql-component.googleapis.com", 
     "sqladmin.googleapis.com",
     "secretmanager.googleapis.com",
     "logging.googleapis.com",
-    "monitoring.googleapis.com"
+    "monitoring.googleapis.com",
+    "containerregistry.googleapis.com"
   ])
   
   project = var.project_id
   service = each.value
   
-  disable_dependent_services = true
+  disable_dependent_services = false
+}
+
+# Service Account for Cloud Run
+resource "google_service_account" "cloud_run_sa" {
+  account_id   = "url-shortener-sa"
+  display_name = "URL Shortener Service Account"
+  
+  depends_on = [google_project_service.apis]
+}
+
+# IAM roles for the service account (FIXED - kept separate from services)
+resource "google_project_iam_member" "cloud_run_sa_roles" {
+  for_each = toset([
+    "roles/cloudsql.client",
+    "roles/secretmanager.secretAccessor", 
+    "roles/logging.logWriter",
+    "roles/monitoring.metricWriter",
+    "roles/run.developer",
+    "roles/run.admin",
+    "roles/iam.serviceAccountUser",
+    "roles/iam.serviceAccountTokenCreator"
+  ])
+  
+  project = var.project_id
+  role    = each.value
+  member  = "serviceAccount:${google_service_account.cloud_run_sa.email}"
 }
 
 # Cloud SQL Database Instance
@@ -98,26 +125,6 @@ resource "google_sql_user" "user" {
   password = var.database_password
 }
 
-# Service Account for Cloud Run
-resource "google_service_account" "cloud_run_sa" {
-  account_id   = "url-shortener-sa"
-  display_name = "URL Shortener Service Account"
-}
-
-# IAM roles for the service account
-resource "google_project_iam_member" "cloud_run_sa_roles" {
-  for_each = toset([
-    "roles/cloudsql.client",
-    "roles/secretmanager.secretAccessor",
-    "roles/logging.logWriter",
-    "roles/monitoring.metricWriter"
-  ])
-  
-  project = var.project_id
-  role    = each.value
-  member  = "serviceAccount:${google_service_account.cloud_run_sa.email}"
-}
-
 # Secret Manager for database URL
 resource "google_secret_manager_secret" "database_url" {
   secret_id = "database-url"
@@ -131,7 +138,7 @@ resource "google_secret_manager_secret" "database_url" {
 
 resource "google_secret_manager_secret_version" "database_url" {
   secret = google_secret_manager_secret.database_url.id
-  secret_data = "postgresql://${google_sql_user.user.name}:${var.database_password}@${google_sql_database_instance.postgres.connection_name}/${google_sql_database.database.name}"
+  secret_data = "postgresql://${google_sql_user.user.name}:${var.database_password}@${google_sql_database_instance.postgres.public_ip_address}:5432/${google_sql_database.database.name}"
 }
 
 # Secret Manager IAM
@@ -149,8 +156,8 @@ resource "google_cloud_run_service" "url_shortener" {
   template {
     metadata {
       annotations = {
-        "autoscaling.knative.dev/maxScale"         = "10"
-        "autoscaling.knative.dev/minScale"         = "0"
+        "autoscaling.knative.dev/maxScale" = "10"
+        "autoscaling.knative.dev/minScale" = "0"
         "run.googleapis.com/cpu-throttling" = "false"
       }
     }
@@ -161,7 +168,7 @@ resource "google_cloud_run_service" "url_shortener" {
       timeout_seconds = 300
       
       containers {
-        image = "gcr.io/cloudrun/hello" # This will be updated by CI/CD
+        image = "gcr.io/cloudrun/hello"
         
         ports {
           container_port = 8000
