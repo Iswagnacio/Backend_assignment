@@ -141,56 +141,6 @@ resource "google_secret_manager_secret_iam_member" "database_url_access" {
   member    = "serviceAccount:${google_service_account.cloud_run_sa.email}"
 }
 
-# Cloud Monitoring Alert Policy
-resource "google_monitoring_alert_policy" "high_error_rate" {
-  display_name = "URL Shortener High Error Rate"
-  combiner     = "OR"
-  
-  conditions {
-    display_name = "Error rate above 5%"
-    
-    condition_threshold {
-      filter          = "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"url-shortener\""
-      duration        = "300s"
-      comparison      = "COMPARISON_GREATER_THAN"
-      threshold_value = 0.05
-      
-      aggregations {
-        alignment_period   = "300s"
-        per_series_aligner = "ALIGN_RATE"
-      }
-    }
-  }
-  
-  notification_channels = []
-  
-  depends_on = [google_project_service.apis]
-}
-
-# Cloud Monitoring Uptime Check
-resource "google_monitoring_uptime_check_config" "health_check" {
-  display_name = "URL Shortener Health Check"
-  timeout      = "10s"
-  period       = "300s"
-  
-  http_check {
-    path         = "/health"
-    port         = "443"
-    use_ssl      = true
-    validate_ssl = true
-  }
-  
-  monitored_resource {
-    type = "uptime_url"
-    labels = {
-      project_id = var.project_id
-      host       = "${google_cloud_run_service.url_shortener.status[0].url}"
-    }
-  }
-  
-  depends_on = [google_project_service.apis, google_cloud_run_service.url_shortener]
-}
-
 # Cloud Run Service
 resource "google_cloud_run_service" "url_shortener" {
   name     = "url-shortener"
@@ -229,7 +179,7 @@ resource "google_cloud_run_service" "url_shortener" {
         
         env {
           name  = "BASE_URL"
-          value = "https://${google_cloud_run_service.url_shortener.status[0].url}"
+          value = "https://placeholder-url.com"
         }
         
         resources {
