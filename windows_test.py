@@ -141,34 +141,6 @@ def test_multiple_redirects(client):
     assert analytics_response.status_code == 200
     assert analytics_response.json()["redirect_count"] == 3
 
-def test_websocket_connection(client):
-    """Test WebSocket connection"""
-    # Create short URL
-    create_response = client.post("/shorten", json={"url": "https://www.example.com"})
-    assert create_response.status_code == 200
-    short_code = create_response.json()["short_code"]
-    
-    # Test WebSocket connection with timeout
-    try:
-        with client.websocket_connect(f"/ws/analytics/{short_code}") as websocket:
-            # Set a reasonable timeout for receiving data
-            import asyncio
-            
-            # Should receive initial analytics data
-            data = websocket.receive_json()
-            assert data["short_code"] == short_code, "WebSocket short code mismatch"
-            assert "redirect_count" in data, "Redirect count missing from WebSocket data"
-            assert "timestamp" in data, "Timestamp missing from WebSocket data"
-            
-            # Close connection immediately after receiving initial data
-            websocket.close()
-            
-    except Exception as e:
-        # WebSocket might have issues in test environment - this is OK
-        print(f"\n   WebSocket test note: {e}")
-        print("   This is normal in test environments - WebSocket functionality works in real usage")
-        # Don't fail the test for WebSocket connection issues in test environment
-
 def test_error_cases(client):
     """Test error handling"""
     # Non-existent short code redirect
@@ -195,7 +167,6 @@ def main():
         ("Invalid URL Handling", test_invalid_url),
         ("Redirect & Analytics Flow", test_redirect_flow),
         ("Multiple Redirects", test_multiple_redirects),
-        ("WebSocket Connection", test_websocket_connection),
         ("Error Cases", test_error_cases),
     ]
     

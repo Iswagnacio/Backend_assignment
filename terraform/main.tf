@@ -73,7 +73,8 @@ resource "google_project_iam_member" "cloud_run_sa_roles" {
     "roles/iam.serviceAccountTokenCreator",
     "roles/storage.admin",                    # For GCR access
     "roles/artifactregistry.writer",          # For Artifact Registry
-    "roles/containerregistry.ServiceAgent"   # For Container Registry
+    "roles/containerregistry.ServiceAgent",  # For Container Registry
+    "roles/serviceusage.serviceUsageAdmin"   # To enable APIs
   ])
   
   project = var.project_id

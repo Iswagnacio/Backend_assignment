@@ -118,7 +118,7 @@ jobs:
     - name: Deploy to Cloud Run
       run: |
         gcloud run deploy ${{ env.SERVICE_NAME }} \
-          --image gcr.io/${{ env.PROJECT_ID }}/backend_assignment:latest \
+          --image us-central1-docker.pkg.dev/${{ env.PROJECT_ID }}/backend-assignment/url-shortener:latest \
           --platform managed \
           --region ${{ env.REGION }} \
           --allow-unauthenticated \
