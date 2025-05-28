@@ -6,10 +6,6 @@ on:
   pull_request:
     branches: [ main ]
 
-env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
-
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -28,16 +24,10 @@ jobs:
         pip install -r requirements.txt
         pip install flake8 black isort pytest
     
-    - name: Lint with flake8 (source files only)
+    - name: Lint and test (non-blocking)
       run: |
-        flake8 main.py windows_test.py websocket_cli_client.py --count --select=E9,F63,F7,F82 --show-source --statistics --exclude=venv,__pycache__,.git,.vscode || echo "Linting completed"
-    
-    - name: Check code formatting (non-blocking)
-      run: |
-        black --check main.py windows_test.py websocket_cli_client.py || echo "Code formatting check completed"
-    
-    - name: Run tests
-      run: |
+        flake8 main.py windows_test.py websocket_cli_client.py --exclude=venv,__pycache__ || echo "Linting completed"
+        black --check main.py windows_test.py websocket_cli_client.py || echo "Formatting check completed"
         pytest windows_test.py -v || echo "Tests completed"
 
   build-and-push:
@@ -45,29 +35,31 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     
-    permissions:
-      contents: read
-      packages: write
-    
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
     
-    - name: Log in to Container Registry
-      uses: docker/login-action@v3
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v2
       with:
-        registry: ${{ env.REGISTRY }}
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
+        credentials_json: ${{ secrets.GCP_SA_KEY }}
     
-    - name: Build and push Docker image
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        push: true
-        tags: |
-          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-          ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v2
+    
+    - name: Configure Docker for GCR
+      run: |
+        gcloud auth configure-docker
+    
+    - name: Build Docker image
+      run: |
+        docker build -t gcr.io/url-shortener-20250527232607/backend_assignment:latest .
+        docker build -t gcr.io/url-shortener-20250527232607/backend_assignment:${{ github.sha }} .
+    
+    - name: Push Docker image
+      run: |
+        docker push gcr.io/url-shortener-20250527232607/backend_assignment:latest
+        docker push gcr.io/url-shortener-20250527232607/backend_assignment:${{ github.sha }}
 
   deploy:
     needs: build-and-push
@@ -86,14 +78,10 @@ jobs:
     - name: Set up Cloud SDK
       uses: google-github-actions/setup-gcloud@v2
     
-    - name: Configure Docker
-      run: |
-        gcloud auth configure-docker ghcr.io
-    
     - name: Deploy to Cloud Run
       run: |
         gcloud run deploy url-shortener \
-          --image ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest \
+          --image gcr.io/url-shortener-20250527232607/backend_assignment:latest \
           --platform managed \
           --region us-central1 \
           --allow-unauthenticated \
