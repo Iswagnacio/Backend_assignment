@@ -59,17 +59,21 @@ jobs:
         gcloud auth configure-docker --quiet
         gcloud auth configure-docker gcr.io --quiet
     
-    - name: Verify GCP authentication and permissions
+    - name: Verify GCP authentication and set project
       run: |
         gcloud auth list
+        gcloud config set project ${{ env.PROJECT_ID }}
         gcloud config get-value project
-        gcloud projects get-iam-policy ${{ env.PROJECT_ID }} --flatten="bindings[].members" --format="table(bindings.role)" --filter="bindings.members:$(gcloud config get-value account)"
+        echo "Authenticated and project set"
     
-    - name: Enable required APIs (if needed)
+    - name: Enable required APIs
       run: |
-        gcloud services enable containerregistry.googleapis.com
-        gcloud services enable artifactregistry.googleapis.com
-        gcloud services enable run.googleapis.com
+        echo "Enabling required Google Cloud APIs..."
+        gcloud services enable cloudresourcemanager.googleapis.com --project=${{ env.PROJECT_ID }}
+        gcloud services enable containerregistry.googleapis.com --project=${{ env.PROJECT_ID }}
+        gcloud services enable artifactregistry.googleapis.com --project=${{ env.PROJECT_ID }}
+        gcloud services enable run.googleapis.com --project=${{ env.PROJECT_ID }}
+        echo "APIs enabled successfully"
     
     - name: Build Docker image
       run: |
@@ -89,7 +93,7 @@ jobs:
         echo "Pushing image to Google Container Registry..."
         docker push gcr.io/${{ env.PROJECT_ID }}/backend_assignment:latest
         docker push gcr.io/${{ env.PROJECT_ID }}/backend_assignment:${{ github.sha }}
-        echo "✅ Images pushed successfully"
+        echo "Images pushed successfully"
 
   deploy:
     needs: build-and-push
@@ -129,8 +133,8 @@ jobs:
     - name: Get service URL
       run: |
         SERVICE_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} --platform managed --region ${{ env.REGION }} --format 'value(status.url)')
-        echo "🚀 Service deployed successfully!"
-        echo "📍 Service URL: $SERVICE_URL"
+        echo "Service deployed successfully!"
+        echo "Service URL: $SERVICE_URL"
         echo "SERVICE_URL=$SERVICE_URL" >> $GITHUB_ENV
     
     - name: Test deployment
