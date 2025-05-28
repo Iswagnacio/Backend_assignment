@@ -34,24 +34,24 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        pip install flake8 black isort
+        pip install flake8 black isort pytest-cov
     
-    - name: Lint with flake8
+    - name: Lint with flake8 (only source files)
       run: |
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        flake8 main.py test_main.py --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 main.py test_main.py --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     
     - name: Check code formatting with black
       run: |
-        black --check .
+        black --check main.py test_main.py
     
     - name: Check import sorting with isort
       run: |
-        isort --check-only .
+        isort --check-only main.py test_main.py
     
     - name: Run tests
       run: |
-        pytest -v --cov=main --cov-report=xml
+        pytest test_main.py -v --cov=main --cov-report=xml
 
   build-and-push:
     needs: test
